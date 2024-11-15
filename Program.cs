@@ -3,9 +3,12 @@ using AutoMapper;
 using BasicStackOverflow;
 using BasicStackOverflow.Entities;
 using BasicStackOverflow.Models;
+using BasicStackOverflow.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using NLog;
+using NLog.Web;
 using static System.Int32;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
@@ -23,6 +26,13 @@ builder.Services.AddDbContext<BasicStackOverflowContext>(
 );
 
 builder.Services.AddAutoMapper(typeof(BasicStackOverflowMappingProfile));
+
+builder.Services.AddScoped<IBSOService, BSOService>();
+
+var logger = NLog.LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger(); 
+builder.Logging.ClearProviders();
+builder.Host.UseNLog();
+
 
 var app = builder.Build();
 
@@ -71,17 +81,9 @@ app.MapGet("getUserAnswers", async ([FromQuery]int id, BasicStackOverflowContext
         .Where(x => x.Id == id).ToListAsync();
 });
 
-app.MapGet("question/{id}", async ([FromRoute] int id, BasicStackOverflowContext db, IMapper _mapper) =>
+app.MapGet("question/{id:int}", async ([FromRoute] int id, IBSOService service) =>
 {
-    var question = await db.Questions.AsNoTracking()
-        .Include(x => x.Answers).ThenInclude(x => x.Author).ThenInclude(x => x.Comments)
-        .Include(x => x.Tags)
-        .Include(x => x.Comments).ThenInclude(x => x.Author)
-        .Include(x => x.Author)
-        .FirstAsync(x => x.Id == id);
-    
-    var result = _mapper.Map<QuestionDTO>(question);
-    
+    var result = await service.GetQuestion(id);
     return Results.Ok(result);
 });
 
