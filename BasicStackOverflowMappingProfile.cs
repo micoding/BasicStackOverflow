@@ -16,5 +16,10 @@ public class BasicStackOverflowMappingProfile : Profile
             .ForMember(q => q.Comments, y=> y.MapFrom(z => z.Comments))
             .ForMember(q => q.Tags, y=> y.MapFrom(z => z.Tags))
             .ForMember(q => q.Answers, y=> y.MapFrom(z => z.Answers));
+        
+        CreateMap<User, GETUserDTO>()
+            .ForMember(x => x.NumberOfComments, y=> y.MapFrom(z => z.Comments.Count))
+            .ForMember(x => x.NumberOfPosts, y=> y.MapFrom(z => z.Posts.Count))
+            .ForMember(x => x.NumberOfVotes, y=> y.MapFrom(z => z.Posts.Count));
     }
 }
