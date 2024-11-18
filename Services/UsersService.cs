@@ -15,10 +15,10 @@ public interface IUsersService
 
 public class UsersService : IUsersService
 {
-    BasicStackOverflowContext _context;
-    IMapper _mapper;
-    ILogger<UsersService> _logger;
-    
+    private readonly BasicStackOverflowContext _context;
+    private ILogger<UsersService> _logger;
+    private readonly IMapper _mapper;
+
     public UsersService(BasicStackOverflowContext context, IMapper mapper, ILogger<UsersService> logger)
     {
         _context = context;
@@ -28,22 +28,22 @@ public class UsersService : IUsersService
 
     public async Task<GETUserDTO> FindUserByIdAsync(int id)
     {
-       var user = await _context.Users.GetUserDTOs().FirstOrDefaultAsync(x => x.Id == id);
-         
-         if(user == null)
-             throw new NotFoundException("Users not found");
-         
-         var userDto = _mapper.Map<GETUserDTO>(user);
-         return userDto;
+        var user = await _context.Users.GetUserDTOs().FirstOrDefaultAsync(x => x.Id == id);
+
+        if (user == null)
+            throw new NotFoundException("Users not found");
+
+        var userDto = _mapper.Map<GETUserDTO>(user);
+        return userDto;
     }
 
     public async Task<IEnumerable<GETUserDTO>> GetAllUsers()
     {
         var users = await _context.Users.GetUserDTOs().ToListAsync();
-         
-        if(!users.Any())
+
+        if (!users.Any())
             throw new NotFoundException("Users not found");
-         
+
         var usersDto = _mapper.Map<List<GETUserDTO>>(users);
         return usersDto;
     }

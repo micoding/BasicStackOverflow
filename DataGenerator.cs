@@ -1,6 +1,5 @@
 using BasicStackOverflow.Entities;
 using Bogus;
-using Bogus.DataSets;
 
 namespace BasicStackOverflow;
 
@@ -12,7 +11,7 @@ public class DataGenerator
         var tagGenerator = new Faker<Tag>().RuleFor(x => x.Name, f => f.Random.AlphaNumeric(10));
 
         var users = userGenerator.Generate(100);
-        
+
         dbContext.AddRange(users);
         //dbContext.SaveChanges();
     }

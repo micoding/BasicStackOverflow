@@ -1,7 +1,5 @@
 using BasicStackOverflow.Entities;
-using BasicStackOverflow.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 
 namespace BasicStackOverflow.ExtensionMethods;
 

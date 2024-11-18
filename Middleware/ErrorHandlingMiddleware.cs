@@ -1,16 +1,16 @@
 using BasicStackOverflow.Exceptions;
-using ILogger = Castle.Core.Logging.ILogger;
 
 namespace BasicStackOverflow.Middleware;
 
 public class ErrorHandlingMiddleware : IMiddleware
 {
-    ILogger<ErrorHandlingMiddleware> _logger;
-    
+    private readonly ILogger<ErrorHandlingMiddleware> _logger;
+
     public ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger)
     {
         _logger = logger;
     }
+
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
         try

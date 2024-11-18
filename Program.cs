@@ -1,17 +1,12 @@
 using System.Text.Json.Serialization;
-using AutoMapper;
 using BasicStackOverflow;
 using BasicStackOverflow.Entities;
-using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.Middleware;
-using BasicStackOverflow.Models;
 using BasicStackOverflow.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Web;
-using static System.Int32;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,7 +29,7 @@ builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<ErrorHandlingMiddleware>();
 builder.Services.AddScoped<RequestTimeMiddleware>();
 
-var logger = NLog.LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger(); 
+var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 builder.Logging.ClearProviders();
 builder.Host.UseNLog();
 
@@ -121,7 +116,7 @@ app.MapGet("users", async (IUsersService service) =>
     return Results.Ok(result);
 });
 
-app.MapGet("user/{id:int}", async ([FromRoute]int id, IUsersService service) =>
+app.MapGet("user/{id:int}", async ([FromRoute] int id, IUsersService service) =>
 {
     var result = await service.FindUserByIdAsync(id);
     return Results.Ok(result);
