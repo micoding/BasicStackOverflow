@@ -3,6 +3,8 @@ using BasicStackOverflow.Entities;
 using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.ExtensionMethods;
 using BasicStackOverflow.Models;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BasicStackOverflow.Services;

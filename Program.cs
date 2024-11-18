@@ -1,8 +1,12 @@
 using System.Text.Json.Serialization;
+using AutoMapper;
 using BasicStackOverflow;
 using BasicStackOverflow.Entities;
+using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.Middleware;
+using BasicStackOverflow.Models;
 using BasicStackOverflow.Services;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NLog;
@@ -121,6 +125,28 @@ app.MapGet("user/{id:int}", async ([FromRoute] int id, IUsersService service) =>
     var result = await service.FindUserByIdAsync(id);
     return Results.Ok(result);
 });
+
+app.MapPost("user", async ([FromBody]CreateUserDTO userDto , IMapper mapper, BasicStackOverflowContext db) =>
+{
+    var newUser = mapper.Map<User>(userDto);
+    await db.AddAsync(newUser);
+    await db.SaveChangesAsync();
+    return Results.Ok(newUser);
+});
+
+app.MapDelete("user/{id:int}", async ([FromRoute] int id, BasicStackOverflowContext db) =>
+{
+    var user = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+        
+    if(user == null)
+        throw new NotFoundException("Users not found");
+        
+    db.Users.Remove(user);
+    await db.SaveChangesAsync();
+
+    return Results.Ok();
+});
+
 
 if (app.Environment.IsDevelopment())
 {

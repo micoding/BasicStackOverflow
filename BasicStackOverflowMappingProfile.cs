@@ -21,5 +21,7 @@ public class BasicStackOverflowMappingProfile : Profile
             .ForMember(x => x.NumberOfComments, y => y.MapFrom(z => z.Comments.Count))
             .ForMember(x => x.NumberOfPosts, y => y.MapFrom(z => z.Posts.Count))
             .ForMember(x => x.NumberOfVotes, y => y.MapFrom(z => z.Posts.Count));
+
+        CreateMap<CreateUserDTO, User>();
     }
 }
