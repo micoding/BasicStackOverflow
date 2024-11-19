@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Serialization;
 using AutoMapper;
 using BasicStackOverflow;
@@ -5,10 +6,14 @@ using BasicStackOverflow.Entities;
 using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.Middleware;
 using BasicStackOverflow.Models;
+using BasicStackOverflow.Models.Validators;
 using BasicStackOverflow.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
+using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using NLog;
 using NLog.Web;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
@@ -32,6 +37,28 @@ builder.Services.AddScoped<IPostsService, PostsService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<ErrorHandlingMiddleware>();
 builder.Services.AddScoped<RequestTimeMiddleware>();
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IValidator<CreateUserDTO>, CreateUserDTOValidator>();
+
+var authenticationSettings = new AuthenticationSettings();
+builder.Configuration.GetSection("Authentication").Bind(authenticationSettings);
+builder.Services.AddSingleton(authenticationSettings);
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(cfg =>
+{
+    cfg.RequireHttpsMetadata = false;
+    cfg.SaveToken = true;
+    cfg.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidIssuer = authenticationSettings.JwtIssuer,
+        ValidAudience = authenticationSettings.JwtIssuer,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authenticationSettings.JwtKey))
+    };
+});
 
 var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 builder.Logging.ClearProviders();
@@ -42,6 +69,9 @@ var app = builder.Build();
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<RequestTimeMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 var scope = app.Services.CreateScope();
 
@@ -126,7 +156,7 @@ app.MapGet("user/{id:int}", async ([FromRoute] int id, IUsersService service) =>
     return Results.Ok(result);
 });
 
-app.MapPost("user", async ([FromBody]CreateUserDTO userDto , IMapper mapper, BasicStackOverflowContext db) =>
+app.MapPost("user", async ([FromBody] CreateUserDTO userDto, IMapper mapper, BasicStackOverflowContext db) =>
 {
     var newUser = mapper.Map<User>(userDto);
     await db.AddAsync(newUser);
@@ -137,26 +167,46 @@ app.MapPost("user", async ([FromBody]CreateUserDTO userDto , IMapper mapper, Bas
 app.MapDelete("user/{id:int}", async ([FromRoute] int id, BasicStackOverflowContext db) =>
 {
     var user = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
-        
-    if(user == null)
+
+    if (user == null)
         throw new NotFoundException("Users not found");
-        
+
     db.Users.Remove(user);
     await db.SaveChangesAsync();
 
     return Results.Ok();
 });
 
-app.MapPost("questions", async ([FromBody]CreateQuestionDTO questionDto, IPostsService postsService) =>
-{
-    return Results.Ok(await postsService.CreateQuestion(questionDto));
-});
+app.MapPost("questions",
+    async ([FromBody] CreateQuestionDTO questionDto, IPostsService postsService) =>
+    {
+        return Results.Ok(await postsService.CreateQuestion(questionDto));
+    });
 
-app.MapPost("question/{id:int}/answer", async ([FromRoute] int id, [FromBody]CreateAnswerDTO createAnswerDto, IPostsService postsService) =>
-{
-    var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
-    return Results.Created($"question/{id}", null);
-});
+app.MapPost("question/{id:int}/answer",
+    async ([FromRoute] int id, [FromBody] CreateAnswerDTO createAnswerDto, IPostsService postsService) =>
+    {
+        var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
+        return Results.Created($"question/{id}", null);
+    });
+
+app.MapPost("users/register",
+    async ([FromBody] CreateUserDTO userDto, IUsersService usersService, IValidator<CreateUserDTO> validator) =>
+    {
+        var validationResult = await validator.ValidateAsync(userDto);
+        if (!validationResult.IsValid)
+            return Results.ValidationProblem(validationResult.ToDictionary());
+
+        var user = await usersService.RegisterUser(userDto);
+
+        return Results.Created($"users/{user.Id}", null);
+    });
+
+app.MapPost("users/login",
+    async ([FromBody] LoginUserDTO userDto, IUsersService usersService) =>
+    {
+        return Results.Ok(usersService.GenerateJwtToken(userDto));
+    });
 
 
 if (app.Environment.IsDevelopment())

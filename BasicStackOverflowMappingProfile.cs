@@ -29,7 +29,7 @@ public class BasicStackOverflowMappingProfile : Profile
             .ForMember(c => c.Tags, y => y.MapFrom(z => z.Tags));
 
         CreateMap<TagDTO, Tag>();
-        
+
         CreateMap<CreateAnswerDTO, Answer>();
     }
 }

@@ -61,12 +61,13 @@ public class PostsService : IPostsService
         if (question.Tags.Any())
         {
             var allTags = await _context.Tags.ToListAsync();
-            var preparedTags = question.Tags.Select(tag => allTags.FirstOrDefault(x => x.Name == tag.Name)).Where(x => x != null).ToList();
+            var preparedTags = question.Tags.Select(tag => allTags.FirstOrDefault(x => x.Name == tag.Name))
+                .Where(x => x != null).ToList();
             preparedTags.ForEach(t => question.Tags.RemoveAll(tag => tag.Name == t.Name));
-            
+
             question.Tags.AddRange(preparedTags);
         }
-        
+
         await _context.AddAsync(question);
         await _context.SaveChangesAsync();
         return question.Id;
@@ -75,17 +76,17 @@ public class PostsService : IPostsService
     public async Task<int> CreateAnswer(int questionId, CreateAnswerDTO answerDto)
     {
         var question = await _context.Questions.FirstOrDefaultAsync(x => x.Id == questionId);
-        
-        if(question is null)
+
+        if (question is null)
             throw new NotFoundException($"Question with ID {questionId} not found.");
-        
+
         answerDto.QuestionId = question.Id;
-        
+
         var answer = _mapper.Map<Answer>(answerDto);
-        
+
         await _context.Answers.AddAsync(answer);
         await _context.SaveChangesAsync();
-        
+
         return answer.Id;
     }
 }

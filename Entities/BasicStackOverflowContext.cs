@@ -13,9 +13,9 @@ public class BasicStackOverflowContext : DbContext
     public DbSet<Tag> Tags { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Vote> Votes { get; set; }
-
     public DbSet<Question> Questions { get; set; }
     public DbSet<Answer> Answers { get; set; }
+    public DbSet<Role> Roles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +44,8 @@ public class BasicStackOverflowContext : DbContext
         {
             u.HasKey(x => x.Id);
             u.Property(x => x.Username).IsRequired();
+            u.Property(x => x.RoleId).IsRequired();
+            u.Property(x => x.PasswordHash).IsRequired();
 
             u.HasMany(us => us.Posts).WithOne(p => p.Author).HasForeignKey(post => post.AuthorId);
         });
@@ -77,5 +79,11 @@ public class BasicStackOverflowContext : DbContext
         });
 
         modelBuilder.Entity<Answer>(a => { a.Property(x => x.QuestionId).IsRequired(); });
+
+        modelBuilder.Entity<Role>(r =>
+        {
+            r.HasKey(x => x.Id);
+            r.Property(x => x.Name).IsRequired();
+        });
     }
 }
