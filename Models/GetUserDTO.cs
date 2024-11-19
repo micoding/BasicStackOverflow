@@ -1,6 +1,6 @@
 namespace BasicStackOverflow.Models;
 
-public class GETUserDTO
+public class GetUserDTO
 {
     public int Id { get; set; }
     public string Username { get; set; }

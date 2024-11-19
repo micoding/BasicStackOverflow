@@ -5,7 +5,7 @@ namespace BasicStackOverflow.ExtensionMethods;
 
 public static class DbSetExtensions
 {
-    public static IQueryable<Question> GetQuestionDTOs(this DbSet<Question> questions)
+    public static IQueryable<Question> IncludeForQuestionDTOs(this DbSet<Question> questions)
     {
         return questions.AsNoTracking()
             .Include(x => x.Answers).ThenInclude(x => x.Author)
@@ -15,7 +15,7 @@ public static class DbSetExtensions
             .Include(x => x.Author);
     }
 
-    public static IQueryable<User> GetUserDTOs(this DbSet<User> users)
+    public static IQueryable<User> IncludeForUserDTOs(this DbSet<User> users)
     {
         return users.AsNoTracking()
             .Include(x => x.Posts)

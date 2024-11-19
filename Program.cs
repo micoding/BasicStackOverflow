@@ -147,6 +147,17 @@ app.MapDelete("user/{id:int}", async ([FromRoute] int id, BasicStackOverflowCont
     return Results.Ok();
 });
 
+app.MapPost("questions", async ([FromBody]CreateQuestionDTO questionDto, IPostsService postsService) =>
+{
+    return Results.Ok(await postsService.CreateQuestion(questionDto));
+});
+
+app.MapPost("question/{id:int}/answer", async ([FromRoute] int id, [FromBody]CreateAnswerDTO createAnswerDto, IPostsService postsService) =>
+{
+    var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
+    return Results.Created($"question/{id}", null);
+});
+
 
 if (app.Environment.IsDevelopment())
 {

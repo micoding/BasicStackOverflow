@@ -17,11 +17,19 @@ public class BasicStackOverflowMappingProfile : Profile
             .ForMember(q => q.Tags, y => y.MapFrom(z => z.Tags))
             .ForMember(q => q.Answers, y => y.MapFrom(z => z.Answers));
 
-        CreateMap<User, GETUserDTO>()
+        CreateMap<User, GetUserDTO>()
             .ForMember(x => x.NumberOfComments, y => y.MapFrom(z => z.Comments.Count))
             .ForMember(x => x.NumberOfPosts, y => y.MapFrom(z => z.Posts.Count))
             .ForMember(x => x.NumberOfVotes, y => y.MapFrom(z => z.Posts.Count));
 
         CreateMap<CreateUserDTO, User>();
+
+        CreateMap<CreateQuestionDTO, Question>()
+            .ForMember(c => c.AuthorId, y => y.MapFrom(z => z.AuthorId))
+            .ForMember(c => c.Tags, y => y.MapFrom(z => z.Tags));
+
+        CreateMap<TagDTO, Tag>();
+        
+        CreateMap<CreateAnswerDTO, Answer>();
     }
 }
