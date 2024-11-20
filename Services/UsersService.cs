@@ -86,7 +86,7 @@ public class UsersService : IUsersService
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Username),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.Role.Name)
         };

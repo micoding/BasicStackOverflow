@@ -25,7 +25,6 @@ public class BasicStackOverflowMappingProfile : Profile
         CreateMap<CreateUserDTO, User>();
 
         CreateMap<CreateQuestionDTO, Question>()
-            .ForMember(c => c.AuthorId, y => y.MapFrom(z => z.AuthorId))
             .ForMember(c => c.Tags, y => y.MapFrom(z => z.Tags));
 
         CreateMap<TagDTO, Tag>();

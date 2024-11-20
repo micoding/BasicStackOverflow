@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using AutoMapper;
 using BasicStackOverflow;
+using BasicStackOverflow.Authorization;
 using BasicStackOverflow.Entities;
 using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.Middleware;
@@ -10,6 +12,7 @@ using BasicStackOverflow.Models.Validators;
 using BasicStackOverflow.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +42,9 @@ builder.Services.AddScoped<ErrorHandlingMiddleware>();
 builder.Services.AddScoped<RequestTimeMiddleware>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IValidator<CreateUserDTO>, CreateUserDTOValidator>();
+builder.Services.AddScoped<IAuthorizationHandler, PostOperationRequirementHandler>();
+builder.Services.AddScoped<IUserContextService, UserContextService>();
+builder.Services.AddHttpContextAccessor();
 
 var authenticationSettings = new AuthenticationSettings();
 builder.Configuration.GetSection("Authentication").Bind(authenticationSettings);
@@ -60,6 +66,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("Admin", policy =>
+        policy
+            .RequireRole("Admin"))
+    .AddPolicy("LogedIn", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+    });
+
 var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 builder.Logging.ClearProviders();
 builder.Host.UseNLog();
@@ -73,11 +88,11 @@ app.UseMiddleware<RequestTimeMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
-var scope = app.Services.CreateScope();
+//var scope = app.Services.CreateScope();
 
-var dbContext = scope.ServiceProvider.GetService<BasicStackOverflowContext>();
+//var dbContext = scope.ServiceProvider.GetService<BasicStackOverflowContext>();
 
-DataGenerator.Seed(dbContext);
+//DataGenerator.Seed(dbContext);
 //
 // app.MapGet("getAllUsers", async (BasicStackOverflowContext db, IMapper mapper) =>
 //     {
@@ -134,7 +149,7 @@ DataGenerator.Seed(dbContext);
 
 app.MapGet("question/{id:int}", async ([FromRoute] int id, IPostsService service) =>
 {
-    var result = await service.GetQuestion(id);
+    var result = await service.GetQuestionDTO(id);
     return Results.Ok(result);
 });
 
@@ -181,14 +196,14 @@ app.MapPost("questions",
     async ([FromBody] CreateQuestionDTO questionDto, IPostsService postsService) =>
     {
         return Results.Ok(await postsService.CreateQuestion(questionDto));
-    });
+    }).RequireAuthorization("LogedIn");
 
 app.MapPost("question/{id:int}/answer",
     async ([FromRoute] int id, [FromBody] CreateAnswerDTO createAnswerDto, IPostsService postsService) =>
     {
         var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
         return Results.Created($"question/{id}", null);
-    });
+    }).RequireAuthorization("LogedIn");
 
 app.MapPost("users/register",
     async ([FromBody] CreateUserDTO userDto, IUsersService usersService, IValidator<CreateUserDTO> validator) =>
@@ -207,6 +222,50 @@ app.MapPost("users/login",
     {
         return Results.Ok(usersService.GenerateJwtToken(userDto));
     });
+
+app.MapDelete("question/{id:int}", async ([FromRoute] int id, IPostsService service, BasicStackOverflowContext db,
+    IAuthorizationService authService, IUserContextService userContext) =>
+{
+    var question = await service.GetQuestion(id);
+
+    var authorizationResult = authService.AuthorizeAsync(userContext.User, question, new PostOperationRequirement()).Result;
+    if (!authorizationResult.Succeeded)
+    {
+        throw new ForbidException();
+    }
+
+    db.Questions.Remove(question);
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
+
+});
+
+app.MapPatch("question/{id:int}/answer/{answerId:int}/markBest", async ([FromRoute] int id, [FromRoute] int answerId, IPostsService service, IAuthorizationService authService, IUserContextService userContext, BasicStackOverflowContext db) =>
+{
+    var question = await service.GetQuestion(id);
+    var answer = question.Answers.FirstOrDefault(x => x.QuestionId == id);
+    
+    if (answer == null)
+        throw new NotFoundException("Answer not found");
+    
+    var authorizationResult = authService.AuthorizeAsync(userContext.User, question, new PostOperationRequirement()).Result;
+    if (!authorizationResult.Succeeded)
+    {
+        throw new ForbidException();
+    }
+    
+    if(question.Answered)
+        throw new QuestionResolvedException("This question has already been answered.");
+
+    answer.BestAnswer = true;
+    question.Answered = true;
+    
+    await db.SaveChangesAsync();
+    
+    return Results.NoContent();
+    
+}).RequireAuthorization("LogedIn");
 
 
 if (app.Environment.IsDevelopment())

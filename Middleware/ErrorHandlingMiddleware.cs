@@ -1,3 +1,4 @@
+using System.Net;
 using BasicStackOverflow.Exceptions;
 
 namespace BasicStackOverflow.Middleware;
@@ -16,6 +17,15 @@ public class ErrorHandlingMiddleware : IMiddleware
         try
         {
             await next.Invoke(context);
+        }
+        catch (QuestionResolvedException qre)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+            await context.Response.WriteAsync(qre.Message);
+        }
+        catch (ForbidException fe)
+        {
+            context.Response.StatusCode = 403;
         }
         catch (BadRequestException bre)
         {
