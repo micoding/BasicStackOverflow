@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: bunut-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: action/checkout@v2
       - name: Setup .NET Core SDK
