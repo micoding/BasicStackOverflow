@@ -10,7 +10,8 @@ namespace BasicStackOverflow.Requests;
 
 public class UserRequests
 {
-    public static async Task<IResult> Register([FromBody] CreateUserDTO userDto, IUsersService usersService, IValidator<CreateUserDTO> validator)
+    public static async Task<IResult> Register([FromBody] CreateUserDTO userDto, IUsersService usersService,
+        IValidator<CreateUserDTO> validator)
     {
         var validationResult = await validator.ValidateAsync(userDto);
         if (!validationResult.IsValid)
@@ -23,7 +24,7 @@ public class UserRequests
 
     public static IResult LogIn([FromBody] LoginUserDTO userDto, IUsersService usersService)
     {
-        string token = usersService.GenerateJwtToken(userDto);
+        var token = usersService.GenerateJwtToken(userDto);
         return Results.Ok(token);
     }
 
@@ -40,7 +41,7 @@ public class UserRequests
         return Results.Ok();
     }
 
-    public static async Task<IResult> GetAll([FromQuery]string search, IUsersService service)
+    public static async Task<IResult> GetAll([FromQuery] string search, IUsersService service)
     {
         var result = await service.GetAllUsers(search);
         return Results.Ok(result);

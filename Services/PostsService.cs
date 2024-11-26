@@ -74,31 +74,34 @@ public class PostsService : IPostsService
 
         var baseQuery = _context.Questions.IncludeForQuestionDTOs()
             .Where(x => query.SearchString == null ||
-                        (x.Title.Contains(query.SearchString)
-                         || x.Content.Contains(query.SearchString)));
+                        x.Title.Contains(query.SearchString)
+                        || x.Content.Contains(query.SearchString));
 
         if (!string.IsNullOrEmpty(query.SortBy))
         {
-            var columnSelector = new Dictionary<string, Expression<Func<Question, object>>>()
+            var columnSelector = new Dictionary<string, Expression<Func<Question, object>>>
             {
                 { nameof(Question.Title), x => x.Title },
                 { nameof(Question.Content), x => x.Content },
                 { nameof(Question.CreationDate), x => x.CreationDate },
-                { nameof(Question.AuthorId), x => x.AuthorId}
+                { nameof(Question.AuthorId), x => x.AuthorId }
             };
-                baseQuery = (bool)query.SortAscending ? baseQuery.OrderBy(columnSelector[query.SortBy]) : baseQuery.OrderByDescending(columnSelector[query.SortBy]);
+            baseQuery = (bool)query.SortAscending
+                ? baseQuery.OrderBy(columnSelector[query.SortBy])
+                : baseQuery.OrderByDescending(columnSelector[query.SortBy]);
         }
 
         var questions = await baseQuery.Skip(query.SkipForPage ?? 0).Take(query.PageSize ?? 1).ToListAsync();
-        
+
         var totalResults = await baseQuery.CountAsync();
-        
+
         if (!questions.Any())
             throw new NotFoundException("No Questions found.");
-        
+
         var result = _mapper.Map<List<QuestionDTO>>(questions);
-        
-        var pagedResult = new PagedResult<QuestionDTO>(result, totalResults, query.PageSize ?? 1, query.PageNumber ?? 1);
+
+        var pagedResult =
+            new PagedResult<QuestionDTO>(result, totalResults, query.PageSize ?? 1, query.PageNumber ?? 1);
 
         return pagedResult;
     }

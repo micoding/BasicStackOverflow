@@ -51,7 +51,8 @@ public class UsersService : IUsersService
 
     public async Task<IEnumerable<GetUserDTO>> GetAllUsers(string search)
     {
-        var users = await _context.Users.IncludeForUserDTOs().Where(x => search == null || x.Username.Contains(search)).ToListAsync();
+        var users = await _context.Users.IncludeForUserDTOs().Where(x => search == null || x.Username.Contains(search))
+            .ToListAsync();
 
         if (!users.Any())
             throw new NotFoundException("Users not found");

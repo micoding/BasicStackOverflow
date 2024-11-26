@@ -1,10 +1,8 @@
 using System.Text;
 using System.Text.Json.Serialization;
-using AutoMapper;
 using BasicStackOverflow;
 using BasicStackOverflow.Authorization;
 using BasicStackOverflow.Entities;
-using BasicStackOverflow.Exceptions;
 using BasicStackOverflow.Filters;
 using BasicStackOverflow.Middleware;
 using BasicStackOverflow.Models;
@@ -15,8 +13,6 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NLog;
@@ -101,63 +97,21 @@ app.UseAuthorization();
 var scope = app.Services.CreateScope();
 var dbContext = scope.ServiceProvider.GetService<BasicStackOverflowContext>();
 DataGenerator.Seed(dbContext);
-//
-// app.MapGet("getAllUsers", async (BasicStackOverflowContext db, IMapper mapper) =>
-//     {
-//         var users = await db.Users.AsNoTracking().Include(x => x.Posts).Include(x => x.Comments)
-//             .Include(x => x.Votes).ToListAsync();
-//         
-//         if(!users.Any())
-//             throw new NotFoundException("Users not found");
-//         
-//         var usersDto = mapper.Map<List<User>>(users);
-//         return usersDto;
-//         
-//     });
-//
-// app.MapPost("getAllUsers", async ([FromQuery]string nameContains, [FromQuery] int? minPostsAmount,  BasicStackOverflowContext db) =>
-// {
-//     minPostsAmount ??= 0;
-//     
-//     var usersFiltered = await db.Users.AsNoTracking().Where(x => x.Username.Contains(nameContains) && x.Posts.Count >= minPostsAmount)
-//         .Select(x => x.Username).ToListAsync();
-//     
-//     return usersFiltered.Any() ? Results.Ok(usersFiltered) : Results.NotFound();
-// });
-//
-// app.MapGet("getUserQuestions/{id}", async ([FromRoute]int id, BasicStackOverflowContext db) =>
-// {
-//     var userQuestions = await db.Questions.AsNoTracking().Where(x => x.AuthorId == id).Include(x => x.Comments)
-//         .Include(x => x.Answers).Include(x => x.Tags)
-//         .Select(x => new
-//         {
-//             x.Title,
-//             Question = x.Content,
-//             Comments = x.Comments.Select(y => new { y.Content, y.CreationDate }),
-//             Answers = x.Answers.Select(y => new
-//             {
-//                 y.Content, y.CreationDate,
-//                 Comments = y.Comments.Select(z => new { y.Content, y.Author, y.CreationDate })
-//             }),
-//             Tags = x.Tags.Select(y => new { y.Name })
-//         }).ToListAsync();
-//
-//     if (!userQuestions.Any())
-//         throw new NotFoundException($"No user found with id: {id}");
-//
-//     return userQuestions;
-// });
-//
-// app.MapGet("getUserAnswers", async ([FromQuery]int id, BasicStackOverflowContext db) =>
-// {
-//    var answers = await db.Answers.AsNoTracking()
-//        .Include(x => x.Question) //.Include(x => x.Question)
-//         .Where(x => x.Id == id).ToListAsync();
-// });
 
 app.MapGet("question/{id:int}", QuestionRequests.GetById);
 
-app.MapGet("questions", QuestionRequests.GetAll).AddEndpointFilter<ValidationFilter<PagesQuery>>().ProducesValidationProblem();
+app.MapGet("questions", QuestionRequests.GetAll).AddEndpointFilter<ValidationFilter<PagesQuery>>()
+    .ProducesValidationProblem();
+
+app.MapDelete("question/{id:int}", QuestionRequests.Delete);
+
+app.MapPatch("question/{id:int}/answer/{answerId:int}/markBest", QuestionRequests.MarkAnswered)
+    .RequireAuthorization("LogedIn");
+
+app.MapPost("question/new", QuestionRequests.Create).RequireAuthorization("LogedIn");
+
+app.MapPost("question/{id:int}/answer", QuestionRequests.AddAnswer).RequireAuthorization("LogedIn");
+
 
 app.MapGet("users", UserRequests.GetAll);
 
@@ -165,18 +119,9 @@ app.MapGet("user/{id:int}", UserRequests.GetById);
 
 app.MapDelete("user/{id:int}", UserRequests.DeletebyId);
 
-app.MapPost("question/new", QuestionRequests.Create).RequireAuthorization("LogedIn");
-
-app.MapPost("question/{id:int}/answer", QuestionRequests.AddAnswer).RequireAuthorization("LogedIn");
-
 app.MapPost("users/register", UserRequests.Register);
 
 app.MapPost("users/login", UserRequests.LogIn);
-
-app.MapDelete("question/{id:int}", QuestionRequests.Delete);
-
-app.MapPatch("question/{id:int}/answer/{answerId:int}/markBest", QuestionRequests.MarkAnswered).RequireAuthorization("LogedIn");
-
 
 if (app.Environment.IsDevelopment())
 {

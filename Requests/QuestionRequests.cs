@@ -15,17 +15,17 @@ public class QuestionRequests
         return Results.Ok(await postsService.CreateQuestion(questionDto));
     }
 
-    public static async Task<IResult> GetAll([AsParameters]PagesQuery query, IPostsService service)
+    public static async Task<IResult> GetAll([AsParameters] PagesQuery query, IPostsService service)
     {
         var result = await service.GetAllQuestions(query);
-        
+
         return result.Items.Count <= 0 ? Results.NotFound() : Results.Ok(result);
     }
 
     public static async Task<IResult> GetById([FromRoute] int id, IPostsService service)
     {
         var result = await service.GetQuestionDTO(id);
-        
+
         return result == null ? Results.NotFound() : Results.Ok(result);
     }
 
@@ -69,7 +69,8 @@ public class QuestionRequests
         return Results.NoContent();
     }
 
-    public static async Task<IResult> AddAnswer([FromRoute] int id, [FromBody] CreateAnswerDTO createAnswerDto, IPostsService postsService)
+    public static async Task<IResult> AddAnswer([FromRoute] int id, [FromBody] CreateAnswerDTO createAnswerDto,
+        IPostsService postsService)
     {
         var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
         return Results.Created($"question/{id}", null);

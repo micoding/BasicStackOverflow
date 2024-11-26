@@ -1,5 +1,4 @@
 using BasicStackOverflow.Entities;
-using Bogus;
 using Microsoft.EntityFrameworkCore;
 
 namespace BasicStackOverflow;
@@ -12,10 +11,7 @@ public class DataGenerator
         {
             var pendingMigrations = dbContext.Database.GetPendingMigrations();
 
-            if (pendingMigrations.Any())
-            {
-                dbContext.Database.Migrate();
-            }
+            if (pendingMigrations.Any()) dbContext.Database.Migrate();
         }
 
         //var userGenerator = new Faker<User>().RuleFor(x => x.Username, f => f.Person.UserName);
