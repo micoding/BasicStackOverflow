@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using AutoMapper;
@@ -6,15 +5,18 @@ using BasicStackOverflow;
 using BasicStackOverflow.Authorization;
 using BasicStackOverflow.Entities;
 using BasicStackOverflow.Exceptions;
+using BasicStackOverflow.Filters;
 using BasicStackOverflow.Middleware;
 using BasicStackOverflow.Models;
 using BasicStackOverflow.Models.Validators;
+using BasicStackOverflow.Requests;
 using BasicStackOverflow.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NLog;
@@ -45,6 +47,16 @@ builder.Services.AddScoped<IValidator<CreateUserDTO>, CreateUserDTOValidator>();
 builder.Services.AddScoped<IAuthorizationHandler, PostOperationRequirementHandler>();
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IValidator<PagesQuery>, PagedQueryValidator>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendClinet", build =>
+    {
+        build.AllowAnyMethod()
+            .AllowAnyHeader()
+            .WithOrigins(builder.Configuration["AllowedOrigins"]);
+    });
+});
 
 var authenticationSettings = new AuthenticationSettings();
 builder.Configuration.GetSection("Authentication").Bind(authenticationSettings);
@@ -70,10 +82,7 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Admin", policy =>
         policy
             .RequireRole("Admin"))
-    .AddPolicy("LogedIn", policy =>
-    {
-        policy.RequireAuthenticatedUser();
-    });
+    .AddPolicy("LogedIn", policy => { policy.RequireAuthenticatedUser(); });
 
 var logger = LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
 builder.Logging.ClearProviders();
@@ -82,17 +91,16 @@ builder.Host.UseNLog();
 
 var app = builder.Build();
 
+app.UseCors("FrontendClinet");
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<RequestTimeMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-//var scope = app.Services.CreateScope();
-
-//var dbContext = scope.ServiceProvider.GetService<BasicStackOverflowContext>();
-
-//DataGenerator.Seed(dbContext);
+var scope = app.Services.CreateScope();
+var dbContext = scope.ServiceProvider.GetService<BasicStackOverflowContext>();
+DataGenerator.Seed(dbContext);
 //
 // app.MapGet("getAllUsers", async (BasicStackOverflowContext db, IMapper mapper) =>
 //     {
@@ -147,125 +155,27 @@ app.UseAuthorization();
 //         .Where(x => x.Id == id).ToListAsync();
 // });
 
-app.MapGet("question/{id:int}", async ([FromRoute] int id, IPostsService service) =>
-{
-    var result = await service.GetQuestionDTO(id);
-    return Results.Ok(result);
-});
+app.MapGet("question/{id:int}", QuestionRequests.GetById);
 
-app.MapGet("questions", async (IPostsService service) =>
-{
-    var result = await service.GetAllQuestions();
-    return Results.Ok(result);
-});
+app.MapGet("questions", QuestionRequests.GetAll).AddEndpointFilter<ValidationFilter<PagesQuery>>().ProducesValidationProblem();
 
-app.MapGet("users", async (IUsersService service) =>
-{
-    var result = await service.GetAllUsers();
-    return Results.Ok(result);
-});
+app.MapGet("users", UserRequests.GetAll);
 
-app.MapGet("user/{id:int}", async ([FromRoute] int id, IUsersService service) =>
-{
-    var result = await service.FindUserByIdAsync(id);
-    return Results.Ok(result);
-});
+app.MapGet("user/{id:int}", UserRequests.GetById);
 
-app.MapPost("user", async ([FromBody] CreateUserDTO userDto, IMapper mapper, BasicStackOverflowContext db) =>
-{
-    var newUser = mapper.Map<User>(userDto);
-    await db.AddAsync(newUser);
-    await db.SaveChangesAsync();
-    return Results.Ok(newUser);
-});
+app.MapDelete("user/{id:int}", UserRequests.DeletebyId);
 
-app.MapDelete("user/{id:int}", async ([FromRoute] int id, BasicStackOverflowContext db) =>
-{
-    var user = await db.Users.FirstOrDefaultAsync(x => x.Id == id);
+app.MapPost("question/new", QuestionRequests.Create).RequireAuthorization("LogedIn");
 
-    if (user == null)
-        throw new NotFoundException("Users not found");
+app.MapPost("question/{id:int}/answer", QuestionRequests.AddAnswer).RequireAuthorization("LogedIn");
 
-    db.Users.Remove(user);
-    await db.SaveChangesAsync();
+app.MapPost("users/register", UserRequests.Register);
 
-    return Results.Ok();
-});
+app.MapPost("users/login", UserRequests.LogIn);
 
-app.MapPost("questions",
-    async ([FromBody] CreateQuestionDTO questionDto, IPostsService postsService) =>
-    {
-        return Results.Ok(await postsService.CreateQuestion(questionDto));
-    }).RequireAuthorization("LogedIn");
+app.MapDelete("question/{id:int}", QuestionRequests.Delete);
 
-app.MapPost("question/{id:int}/answer",
-    async ([FromRoute] int id, [FromBody] CreateAnswerDTO createAnswerDto, IPostsService postsService) =>
-    {
-        var newAnswerId = await postsService.CreateAnswer(id, createAnswerDto);
-        return Results.Created($"question/{id}", null);
-    }).RequireAuthorization("LogedIn");
-
-app.MapPost("users/register",
-    async ([FromBody] CreateUserDTO userDto, IUsersService usersService, IValidator<CreateUserDTO> validator) =>
-    {
-        var validationResult = await validator.ValidateAsync(userDto);
-        if (!validationResult.IsValid)
-            return Results.ValidationProblem(validationResult.ToDictionary());
-
-        var user = await usersService.RegisterUser(userDto);
-
-        return Results.Created($"users/{user.Id}", null);
-    });
-
-app.MapPost("users/login",
-    async ([FromBody] LoginUserDTO userDto, IUsersService usersService) =>
-    {
-        return Results.Ok(usersService.GenerateJwtToken(userDto));
-    });
-
-app.MapDelete("question/{id:int}", async ([FromRoute] int id, IPostsService service, BasicStackOverflowContext db,
-    IAuthorizationService authService, IUserContextService userContext) =>
-{
-    var question = await service.GetQuestion(id);
-
-    var authorizationResult = authService.AuthorizeAsync(userContext.User, question, new PostOperationRequirement()).Result;
-    if (!authorizationResult.Succeeded)
-    {
-        throw new ForbidException();
-    }
-
-    db.Questions.Remove(question);
-    await db.SaveChangesAsync();
-
-    return Results.NoContent();
-
-});
-
-app.MapPatch("question/{id:int}/answer/{answerId:int}/markBest", async ([FromRoute] int id, [FromRoute] int answerId, IPostsService service, IAuthorizationService authService, IUserContextService userContext, BasicStackOverflowContext db) =>
-{
-    var question = await service.GetQuestion(id);
-    var answer = question.Answers.FirstOrDefault(x => x.QuestionId == id);
-    
-    if (answer == null)
-        throw new NotFoundException("Answer not found");
-    
-    var authorizationResult = authService.AuthorizeAsync(userContext.User, question, new PostOperationRequirement()).Result;
-    if (!authorizationResult.Succeeded)
-    {
-        throw new ForbidException();
-    }
-    
-    if(question.Answered)
-        throw new QuestionResolvedException("This question has already been answered.");
-
-    answer.BestAnswer = true;
-    question.Answered = true;
-    
-    await db.SaveChangesAsync();
-    
-    return Results.NoContent();
-    
-}).RequireAuthorization("LogedIn");
+app.MapPatch("question/{id:int}/answer/{answerId:int}/markBest", QuestionRequests.MarkAnswered).RequireAuthorization("LogedIn");
 
 
 if (app.Environment.IsDevelopment())

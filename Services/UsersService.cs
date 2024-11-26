@@ -15,7 +15,7 @@ namespace BasicStackOverflow.Services;
 public interface IUsersService
 {
     Task<GetUserDTO> FindUserByIdAsync(int id);
-    Task<IEnumerable<GetUserDTO>> GetAllUsers();
+    Task<IEnumerable<GetUserDTO>> GetAllUsers(string search);
     Task<User> RegisterUser(CreateUserDTO userDto);
     string GenerateJwtToken(LoginUserDTO userDto);
 }
@@ -49,9 +49,9 @@ public class UsersService : IUsersService
         return userDto;
     }
 
-    public async Task<IEnumerable<GetUserDTO>> GetAllUsers()
+    public async Task<IEnumerable<GetUserDTO>> GetAllUsers(string search)
     {
-        var users = await _context.Users.IncludeForUserDTOs().ToListAsync();
+        var users = await _context.Users.IncludeForUserDTOs().Where(x => search == null || x.Username.Contains(search)).ToListAsync();
 
         if (!users.Any())
             throw new NotFoundException("Users not found");
